@@ -10,7 +10,7 @@ from image_extractor import extract_images_and_text
 
 load_dotenv()
 
-
+st.set_page_config(page_title="AI-Powered Note Summarizer", page_icon="🧠", layout="wide")
 st.title("🧠 AI-Powered Note Summarizer with Image Support")
 
 if "summary" not in st.session_state:
@@ -19,7 +19,7 @@ if "qa_chain" not in st.session_state:
     st.session_state.qa_chain = None
 
 uploaded = st.file_uploader("Upload a PDF or TXT file", type=["pdf", "txt"])
-process = st.button("Process Notes")
+process = st.button("Process Notes", type="primary")
 
 if process and uploaded:
     ext = uploaded.name.split(".")[-1].lower()
@@ -41,7 +41,7 @@ if st.session_state.summary:
 
 st.subheader("Ask Questions")
 q = st.text_input("Your question")
-ask = st.button("Get Answer")
+ask = st.button("Get Answer", type="primary")
 
 if ask and st.session_state.qa_chain:
     ans = st.session_state.qa_chain(q)
