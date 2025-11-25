@@ -3,15 +3,20 @@ from dotenv import load_dotenv
 import os
 import PyPDF2
 
-from summarizer import llm_summarize
-from qa import build_llm_retriever
+from summarizer import llm_summarize_stream
+from qa import build_llm_retriever_stream
 from image_extractor import extract_images_and_text
 
+st.set_page_config(page_title="AI-Powered Note Summarizer", page_icon="🧠", layout="wide")
 load_dotenv()
 
-st.set_page_config(page_title="AI-Powered Note Summarizer", page_icon="🧠", layout="wide")
-
 st.title("🧠 AI-Powered Note Summarizer with Image Support")
+
+model_choice = st.selectbox(
+    "Choose the model:",
+    options=["gpt-5-mini", "gpt-5.1", "gpt-4o-mini"],
+    index=0
+)
 
 if "summary" not in st.session_state:
     st.session_state.summary = ""
@@ -40,18 +45,23 @@ if process and uploaded and not st.session_state.cancel:
     else:
         reader = PyPDF2.PdfReader(uploaded)
         text = "\n".join([p.extract_text() or "" for p in reader.pages])
-        uploaded.seek(0)  # reset pointer for image extractor
+        uploaded.seek(0)
         image_texts = extract_images_and_text(uploaded)
 
-    # Spinner while processing
-    with st.spinner("⏳ Processing notes and generating summary..."):
-        st.session_state.summary = llm_summarize(text, image_texts)
-        st.session_state.qa_chain = build_llm_retriever(text, image_texts)
+    with st.spinner(f"⏳ Processing notes with {model_choice}..."):
+        stream_fn = llm_summarize_stream(text, image_texts, model=model_choice)
+        placeholder = st.empty()
+        summary_text = ""
+        for chunk in stream_fn():
+            summary_text += chunk
+            placeholder.markdown(summary_text)
+        st.session_state.summary = summary_text
+        st.session_state.qa_chain = build_llm_retriever_stream(text, image_texts, model=model_choice)
 
-    st.success("✅ Notes processed successfully!")
+    st.success(f"✅ Notes processed successfully with {model_choice}!")
 
 if st.session_state.summary:
-    st.subheader("Summary")
+    st.subheader(f"Summary (generated with {model_choice})")
     st.write(st.session_state.summary)
 
 st.subheader("Ask Questions")
@@ -59,7 +69,9 @@ q = st.text_input("Your question")
 ask = st.button("Get Answer", type="primary")
 
 if ask and st.session_state.qa_chain and not st.session_state.cancel:
-    with st.spinner("🤖 Thinking..."):
-        ans = st.session_state.qa_chain(q)
-    st.markdown("**Answer:**")
-    st.info(ans)
+    with st.spinner(f"🤖 {model_choice} is thinking..."):
+        placeholder = st.empty()
+        answer_text = ""
+        for chunk in st.session_state.qa_chain(q):
+            answer_text += chunk
+            placeholder.markdown(answer_text)

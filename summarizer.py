@@ -1,6 +1,4 @@
-# summarizer.py
 import os
-
 try:
     from langchain.text_splitter import RecursiveCharacterTextSplitter
 except ImportError:
@@ -11,12 +9,12 @@ from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnableSequence
 
-def llm_summarize(text: str, image_texts: list[str] = None) -> str:
+def llm_summarize_stream(text: str, image_texts: list[str] = None, model: str = "gpt-5-mini"):
     """
-    Summarize text + image descriptions into concise notes using GPT‑5-mini.
+    Stream summary text chunk by chunk using the selected model.
     """
     api_key = os.getenv("OPENAI_API_KEY")
-    llm = ChatOpenAI(model="gpt-5-mini", temperature=0, api_key=api_key)
+    llm = ChatOpenAI(model=model, temperature=0, api_key=api_key, streaming=True)
 
     if image_texts:
         text += "\n\n" + "\n".join(image_texts)
@@ -29,5 +27,11 @@ def llm_summarize(text: str, image_texts: list[str] = None) -> str:
     )
 
     chain = RunnableSequence(prompt | llm | StrOutputParser())
-    summaries = [chain.invoke({"input_text": d.page_content}) for d in docs]
-    return "\n".join(summaries)
+
+    # Return a generator that yields chunks
+    def stream_summary():
+        for d in docs:
+            for chunk in chain.stream({"input_text": d.page_content}):
+                yield chunk
+
+    return stream_summary

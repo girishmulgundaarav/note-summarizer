@@ -1,6 +1,4 @@
-# qa.py
 import os
-
 try:
     from langchain.text_splitter import RecursiveCharacterTextSplitter
 except ImportError:
@@ -9,9 +7,9 @@ except ImportError:
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_community.vectorstores import FAISS
 
-def build_llm_retriever(text: str, image_texts: list[str] = None):
+def build_llm_retriever_stream(text: str, image_texts: list[str] = None, model: str = "gpt-5-mini"):
     """
-    Build a retriever + QA pipeline using GPT‑5-mini, including image descriptions.
+    Build retriever + QA pipeline with streaming answers.
     """
     api_key = os.getenv("OPENAI_API_KEY")
 
@@ -25,7 +23,7 @@ def build_llm_retriever(text: str, image_texts: list[str] = None):
     vectorstore = FAISS.from_documents(docs, embeddings)
     retriever = vectorstore.as_retriever()
 
-    llm = ChatOpenAI(model="gpt-5-mini", temperature=0, api_key=api_key)
+    llm = ChatOpenAI(model=model, temperature=0, api_key=api_key, streaming=True)
 
     from langchain_core.prompts import PromptTemplate
     from langchain_core.output_parsers import StrOutputParser
@@ -37,9 +35,9 @@ def build_llm_retriever(text: str, image_texts: list[str] = None):
 
     chain = RunnableSequence(prompt | llm | StrOutputParser())
 
-    def qa_chain(question: str):
+    def qa_chain_stream(question: str):
         docs = retriever.invoke(question)
         context = "\n\n".join([d.page_content for d in docs])
-        return chain.invoke({"context": context, "question": question})
+        return chain.stream({"context": context, "question": question})
 
-    return qa_chain
+    return qa_chain_stream
