@@ -1,0 +1,33 @@
+# summarizer.py
+import os
+
+try:
+    from langchain.text_splitter import RecursiveCharacterTextSplitter
+except ImportError:
+    from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+from langchain_openai import ChatOpenAI
+from langchain_core.prompts import PromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.runnables import RunnableSequence
+
+def llm_summarize(text: str, image_texts: list[str] = None) -> str:
+    """
+    Summarize text + image descriptions into concise notes using GPT‑5-mini.
+    """
+    api_key = os.getenv("OPENAI_API_KEY")
+    llm = ChatOpenAI(model="gpt-5-mini", temperature=0, api_key=api_key)
+
+    if image_texts:
+        text += "\n\n" + "\n".join(image_texts)
+
+    splitter = RecursiveCharacterTextSplitter(chunk_size=1500, chunk_overlap=200)
+    docs = splitter.create_documents([text])
+
+    prompt = PromptTemplate.from_template(
+        "Summarize the following notes (including image descriptions) into concise bullet points:\n\n{input_text}"
+    )
+
+    chain = RunnableSequence(prompt | llm | StrOutputParser())
+    summaries = [chain.invoke({"input_text": d.page_content}) for d in docs]
+    return "\n".join(summaries)
